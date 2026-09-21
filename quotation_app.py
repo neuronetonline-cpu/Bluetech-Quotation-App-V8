@@ -43,17 +43,26 @@ def resource_path(name):
 
 
 def register_fonts():
-    font_path = resource_path("Deadly Advance.ttf")
-    if os.path.exists(font_path):
+    deadly = False
+    sinhala = False
+    deadly_path = resource_path("Deadly Advance.ttf")
+    sinhala_path = resource_path("FMGanganee x.ttf")
+    if os.path.exists(deadly_path):
         try:
-            pdfmetrics.registerFont(TTFont("DeadlyAdvance", font_path))
-            return True
+            pdfmetrics.registerFont(TTFont("DeadlyAdvance", deadly_path))
+            deadly = True
         except Exception:
             pass
-    return False
+    if os.path.exists(sinhala_path):
+        try:
+            pdfmetrics.registerFont(TTFont("FMGanganee", sinhala_path))
+            sinhala = True
+        except Exception:
+            pass
+    return deadly, sinhala
 
 
-DEADLY_ADVANCE_AVAILABLE = register_fonts()
+DEADLY_ADVANCE_AVAILABLE, FM_GANGANEE_AVAILABLE = register_fonts()
 
 
 def db():
@@ -730,6 +739,8 @@ class App:
         story.append(warranty_row)
         story.append(Spacer(1, 7))
 
+        sinhala_font_tag = "<font name=\"FMGanganee\">" if FM_GANGANEE_AVAILABLE else ""
+        sinhala_font_end = "</font>" if FM_GANGANEE_AVAILABLE else ""
         terms = Paragraph(
             "<b>Terms & Conditions</b><br/>"
             "• Quotation Validity: Prices are valid for 2 days from the quotation date and time.<br/>"
@@ -737,7 +748,7 @@ class App:
             "• Stock Availability: Product availability is subject to change without prior notice.<br/>"
             "• Support: For further information or assistance, please contact us by phone or WhatsApp.<br/>"
             "• COD: Courier charges must be paid to our bank account before dispatch.<br/>"
-            "• COD: Courier charges dispatch කිරීමට පෙර bank account එකට ගෙවිය යුතුය.",
+            + sinhala_font_tag + "COD: Courier charges dispatch කිරීමට පෙර bank account එකට ගෙවිය යුතුය." + sinhala_font_end,
             small
         )
 
@@ -991,17 +1002,17 @@ class App:
 
         tree.pack(fill="both", expand=True, padx=10, pady=(0, 8))
 
+        c = db()
+        rows = c.execute(
+            """SELECT id,qno,customer,phone,date,profit,warranty90,warranty180,prepared_by
+               FROM quotations ORDER BY id DESC"""
+        ).fetchall()
+        c.close()
+
         def refresh(*_):
             term = search_var.get().strip().lower()
             for item in tree.get_children():
                 tree.delete(item)
-
-            c = db()
-            rows = c.execute(
-                """SELECT id,qno,customer,phone,date,profit,warranty90,warranty180,prepared_by
-                   FROM quotations ORDER BY id DESC"""
-            ).fetchall()
-            c.close()
 
             for row in rows:
                 qid, qno, customer, phone, date, profit, p90, p180, prepared_by = row
@@ -1020,41 +1031,6 @@ class App:
                         money(profit), money(p90), money(p180)
                     )
                 )
-
-        def delete_history_item():
-            selected = tree.selection()
-            if not selected:
-                messagebox.showwarning(
-                    "Delete Quotation", "Select a quotation first.", parent=win
-                )
-                return
-
-            qid = int(selected[0])
-            item = tree.item(selected[0], "values")
-            qno = item[0] if item else "this quotation"
-
-            if not messagebox.askyesno(
-                "Delete Quotation",
-                f"Are you sure you want to delete quotation {qno}?\n\nThis action cannot be undone.",
-                parent=win
-            ):
-                return
-
-            c = db()
-            c.execute("DELETE FROM items WHERE quotation_id=?", (qid,))
-            c.execute("DELETE FROM quotations WHERE id=?", (qid,))
-            c.commit()
-            c.close()
-
-            if self.editing_id == qid:
-                self.editing_id = None
-
-            refresh()
-            messagebox.showinfo(
-                "Delete Quotation",
-                f"Quotation {qno} was deleted.",
-                parent=win
-            )
 
         search_var.trace_add("write", refresh)
         refresh()
@@ -1081,11 +1057,6 @@ class App:
         ttk.Button(
             btns, text="WHATSAPP",
             command=lambda: self.whatsapp_history_item(tree, win)
-        ).pack(side="left", padx=5)
-
-        ttk.Button(
-            btns, text="DELETE SELECTED",
-            command=delete_history_item
         ).pack(side="left", padx=5)
 
         ttk.Button(
