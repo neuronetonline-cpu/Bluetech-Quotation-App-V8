@@ -311,10 +311,16 @@ class App:
         widgets = []
 
         for j, var in enumerate([p, d, q, c]):
-            e = ttk.Entry(self.table, textvariable=var)
+            # Only PRODUCT DESCRIPTION values are centered in the entry grid.
+            # PRODUCT, QTY and COST keep their existing alignment.
+            e = ttk.Entry(self.table, textvariable=var, justify=("center" if j == 1 else "left"))
             e.grid(row=r, column=j, padx=2, pady=2, sticky="ew")
             widgets.append(e)
             e.bind("<KeyRelease>", lambda e: self.recalc())
+            if j == 1:
+                e.bind("<Return>", lambda event, widget=e: self.focus_next_row_field(widget, 1))
+            elif j == 3:
+                e.bind("<Return>", lambda event, widget=e: self.focus_next_row_field(widget, 3))
 
         btn = ttk.Button(
             self.table, text="X", width=5,
@@ -325,6 +331,23 @@ class App:
 
         if not silent:
             self.recalc()
+
+    def focus_next_row_field(self, widget, column):
+        """Move Enter-key focus to the same field in the next visible row."""
+        current_idx = None
+        for idx, row in enumerate(self.rows):
+            if widget in row[4]:
+                current_idx = idx
+                break
+
+        if current_idx is None:
+            return "break"
+
+        next_idx = current_idx + 1
+        if next_idx < len(self.rows):
+            self.rows[next_idx][4][column].focus_set()
+            self.rows[next_idx][4][column].selection_range(0, tk.END)
+        return "break"
 
     def remove_row(self, idx):
         if idx >= len(self.rows):
@@ -625,6 +648,7 @@ class App:
             ("TOPPADDING", (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
             ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 1), (2, -1), "CENTER"),
             ("ALIGN", (-1, 0), (-1, -1), "CENTER"),
         ]))
         story.append(t)
@@ -711,7 +735,9 @@ class App:
             "• Quotation Validity: Prices are valid for 2 days from the quotation date and time.<br/>"
             "• Warranty: Warranty covers MANUFACTURER FAULTS ONLY. Physical damage, burns, liquid damage, and other external damages are not covered.<br/>"
             "• Stock Availability: Product availability is subject to change without prior notice.<br/>"
-            "• Support: For further information or assistance, please contact us by phone or WhatsApp.",
+            "• Support: For further information or assistance, please contact us by phone or WhatsApp.<br/>"
+            "• COD: Courier charges must be paid to our bank account before dispatch.<br/>"
+            "• COD: Courier charges dispatch කිරීමට පෙර bank account එකට ගෙවිය යුතුය.",
             small
         )
 
@@ -965,17 +991,17 @@ class App:
 
         tree.pack(fill="both", expand=True, padx=10, pady=(0, 8))
 
-        c = db()
-        rows = c.execute(
-            """SELECT id,qno,customer,phone,date,profit,warranty90,warranty180,prepared_by
-               FROM quotations ORDER BY id DESC"""
-        ).fetchall()
-        c.close()
-
         def refresh(*_):
             term = search_var.get().strip().lower()
             for item in tree.get_children():
                 tree.delete(item)
+
+            c = db()
+            rows = c.execute(
+                """SELECT id,qno,customer,phone,date,profit,warranty90,warranty180,prepared_by
+                   FROM quotations ORDER BY id DESC"""
+            ).fetchall()
+            c.close()
 
             for row in rows:
                 qid, qno, customer, phone, date, profit, p90, p180, prepared_by = row
@@ -994,6 +1020,41 @@ class App:
                         money(profit), money(p90), money(p180)
                     )
                 )
+
+        def delete_history_item():
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning(
+                    "Delete Quotation", "Select a quotation first.", parent=win
+                )
+                return
+
+            qid = int(selected[0])
+            item = tree.item(selected[0], "values")
+            qno = item[0] if item else "this quotation"
+
+            if not messagebox.askyesno(
+                "Delete Quotation",
+                f"Are you sure you want to delete quotation {qno}?\n\nThis action cannot be undone.",
+                parent=win
+            ):
+                return
+
+            c = db()
+            c.execute("DELETE FROM items WHERE quotation_id=?", (qid,))
+            c.execute("DELETE FROM quotations WHERE id=?", (qid,))
+            c.commit()
+            c.close()
+
+            if self.editing_id == qid:
+                self.editing_id = None
+
+            refresh()
+            messagebox.showinfo(
+                "Delete Quotation",
+                f"Quotation {qno} was deleted.",
+                parent=win
+            )
 
         search_var.trace_add("write", refresh)
         refresh()
@@ -1020,6 +1081,11 @@ class App:
         ttk.Button(
             btns, text="WHATSAPP",
             command=lambda: self.whatsapp_history_item(tree, win)
+        ).pack(side="left", padx=5)
+
+        ttk.Button(
+            btns, text="DELETE SELECTED",
+            command=delete_history_item
         ).pack(side="left", padx=5)
 
         ttk.Button(
