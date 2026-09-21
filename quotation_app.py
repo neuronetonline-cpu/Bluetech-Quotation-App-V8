@@ -222,8 +222,11 @@ class App:
         self.table.grid(row=1, column=0, columnspan=5, sticky="nsew")
         box.rowconfigure(1, weight=1)
 
-        for j, w in enumerate([23, 42, 10, 20, 10]):
+        # Keep the entry columns aligned with the headers.
+        column_widths = [23, 42, 10, 20, 10]
+        for j, w in enumerate(column_widths):
             box.columnconfigure(j, weight=1, minsize=w * 8)
+            self.table.columnconfigure(j, weight=1, minsize=w * 8)
 
         self.rows = []
         for p in DEFAULT_PRODUCTS:
@@ -266,10 +269,13 @@ class App:
             e.grid(row=1, column=i, padx=5)
             if lab in ("Requested Profit", "Weight (KG)"):
                 e.bind("<KeyRelease>", lambda e: self.recalc())
+            calc.columnconfigure(i, weight=1)
 
+        # Keep the Calculate button separate from the COD Charge field.
         ttk.Button(calc, text="CALCULATE", command=self.recalc).grid(
-            row=1, column=5, padx=8
+            row=1, column=len(labels), padx=8, sticky="ew"
         )
+        calc.columnconfigure(len(labels), weight=0)
 
         actions = ttk.Frame(self.root, padding=10)
         actions.pack(fill="x", padx=12)
