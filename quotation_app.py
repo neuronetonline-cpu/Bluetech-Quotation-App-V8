@@ -46,7 +46,7 @@ def register_fonts():
     deadly = False
     sinhala = False
     deadly_path = resource_path("Deadly Advance.ttf")
-    sinhala_path = resource_path("FMGanganee x.ttf")
+    sinhala_path = resource_path("NotoSansSinhala.ttf")
     if os.path.exists(deadly_path):
         try:
             pdfmetrics.registerFont(TTFont("DeadlyAdvance", deadly_path))
@@ -55,14 +55,14 @@ def register_fonts():
             pass
     if os.path.exists(sinhala_path):
         try:
-            pdfmetrics.registerFont(TTFont("FMGanganee", sinhala_path))
+            pdfmetrics.registerFont(TTFont("NotoSinhala", sinhala_path))
             sinhala = True
         except Exception:
             pass
     return deadly, sinhala
 
 
-DEADLY_ADVANCE_AVAILABLE, FM_GANGANEE_AVAILABLE = register_fonts()
+DEADLY_ADVANCE_AVAILABLE, NOTO_SINHALA_AVAILABLE = register_fonts()
 
 
 def db():
@@ -739,8 +739,8 @@ class App:
         story.append(warranty_row)
         story.append(Spacer(1, 7))
 
-        sinhala_font_tag = "<font name=\"FMGanganee\">" if FM_GANGANEE_AVAILABLE else ""
-        sinhala_font_end = "</font>" if FM_GANGANEE_AVAILABLE else ""
+        sinhala_font_tag = "<font name=\"NotoSinhala\">" if NOTO_SINHALA_AVAILABLE else ""
+        sinhala_font_end = "</font>" if NOTO_SINHALA_AVAILABLE else ""
         terms = Paragraph(
             "<b>Terms & Conditions</b><br/>"
             "• Quotation Validity: Prices are valid for 2 days from the quotation date and time.<br/>"
